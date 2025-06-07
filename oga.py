@@ -2,7 +2,7 @@ from fastapi import FastAPI, Form
 from fastapi.responses import PlainTextResponse
 from twilio.twiml.messaging_response import MessagingResponse
 import requests
-from googletrans import Translator
+from google_trans_new import google_translator  # <-- CHANGED THIS LINE
 import os
 from dotenv import load_dotenv
 
@@ -16,7 +16,8 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 if not GROQ_API_KEY:
     raise ValueError("GROQ_API_KEY environment variable not set. Please create a .env file or set it in your environment.")
 
-translator = Translator()
+# translator = Translator() # <-- REMOVED THIS LINE
+translator = google_translator() # <-- ADDED/CHANGED THIS LINE
 
 # --- AI Logic ---
 def generate_reply(user_input: str) -> str:
@@ -26,7 +27,8 @@ def generate_reply(user_input: str) -> str:
     """
     try:
         # Attempt to translate to English first, letting the library detect the source language
-        translated_input_obj = translator.translate(user_input, dest='en')
+        # CHANGED: Use lang_src and lang_tgt for google_trans_new
+        translated_input_obj = translator.translate(user_input, lang_src='auto', lang_tgt='en')
         detected_lang = translated_input_obj.src # Get the detected source language
         user_input_for_groq = translated_input_obj.text if detected_lang == "ha" else user_input
     except Exception as e:
@@ -176,7 +178,8 @@ Always escalate to a human if:
         reply_english = result["choices"][0]["message"]["content"]
 
         if detected_lang == "ha":
-            final_reply = translator.translate(reply_english, dest='ha').text
+            # CHANGED: Use lang_src and lang_tgt for google_trans_new
+            final_reply = translator.translate(reply_english, lang_src='en', lang_tgt='ha').text
         else:
             final_reply = reply_english
 
@@ -208,9 +211,3 @@ async def whatsapp_webhook(
     twilio_response.message(reply_text)
 
     return str(twilio_response)
-
-# --- How to run (for local development) ---
-# To run this FastAPI app, save it as `main.py` (or similar) and run:
-# `uvicorn main:app --reload`
-# You'll also need to expose it to the internet using a tool like ngrok
-# for Twilio to send webhooks to your local machine.
