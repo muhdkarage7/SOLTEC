@@ -1,8 +1,8 @@
 from fastapi import FastAPI, Form
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import Response # <-- CHANGED THIS IMPORT
 from twilio.twiml.messaging_response import MessagingResponse
 import requests
-from google_trans import Translator  # <-- CHANGED THIS LINE AGAIN!
+from google_trans import Translator
 import os
 from dotenv import load_dotenv
 
@@ -16,10 +16,10 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 if not GROQ_API_KEY:
     raise ValueError("GROQ_API_KEY environment variable not set. Please create a .env file or set it in your environment.")
 
-# translator = google_translator() # <-- REMOVED THIS LINE
-translator = Translator() # <-- ADDED/CHANGED THIS LINE AGAIN!
+translator = Translator()
 
 # --- AI Logic ---
+# ... (your generate_reply function remains the same) ...
 def generate_reply(user_input: str) -> str:
     """
     Generates a reply from the Groq API, translating input/output
@@ -27,10 +27,6 @@ def generate_reply(user_input: str) -> str:
     """
     try:
         # Attempt to translate to English first, letting the library detect the source language
-        # IMPORTANT: google_trans (like googletrans) often uses 'dest' instead of 'lang_tgt'
-        # and returns a simple string or a different object.
-        # Let's revert to the original googletrans method call for simplicity,
-        # assuming google_trans 2.4.0 behaves like googletrans.
         translated_input_obj = translator.translate(user_input, dest='en') # <--- Changed param back to 'dest'
         detected_lang = translated_input_obj.src # This should still work if it returns a Translation object
         user_input_for_groq = translated_input_obj.text if detected_lang == "ha" else user_input
@@ -181,8 +177,7 @@ Always escalate to a human if:
         reply_english = result["choices"][0]["message"]["content"]
 
         if detected_lang == "ha":
-            # Reverting parameters for translate method based on google_trans behavior
-            final_reply = translator.translate(reply_english, dest='ha').text # <--- Changed param back to 'dest'
+            final_reply = translator.translate(reply_english, dest='ha').text
         else:
             final_reply = reply_english
 
@@ -198,7 +193,7 @@ Always escalate to a human if:
         return "An unexpected error occurred. Please try again."
 
 # --- FastAPI Webhook ---
-@app.post("/webhook", response_class=PlainTextResponse)
+@app.post("/webhook") # <-- REMOVED response_class=PlainTextResponse
 async def whatsapp_webhook(
     Body: str = Form(...),
     From: str = Form(...)
@@ -213,5 +208,5 @@ async def whatsapp_webhook(
     twilio_response = MessagingResponse()
     twilio_response.message(reply_text)
 
-    return str(twilio_response)
-
+    # Return TwiML with the correct Content-Type header
+    return Response(content=str(twilio_response), media_type="application/xml")
