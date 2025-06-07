@@ -2,7 +2,7 @@ from fastapi import FastAPI, Form
 from fastapi.responses import PlainTextResponse
 from twilio.twiml.messaging_response import MessagingResponse
 import requests
-from google_trans import google_translator  # <-- CHANGED THIS LINE AGAIN!
+from google_trans import Translator  # <-- CHANGED THIS LINE AGAIN!
 import os
 from dotenv import load_dotenv
 
@@ -16,7 +16,8 @@ GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 if not GROQ_API_KEY:
     raise ValueError("GROQ_API_KEY environment variable not set. Please create a .env file or set it in your environment.")
 
-translator = google_translator() # This line remains the same as previous fix
+# translator = google_translator() # <-- REMOVED THIS LINE
+translator = Translator() # <-- ADDED/CHANGED THIS LINE AGAIN!
 
 # --- AI Logic ---
 def generate_reply(user_input: str) -> str:
@@ -26,8 +27,12 @@ def generate_reply(user_input: str) -> str:
     """
     try:
         # Attempt to translate to English first, letting the library detect the source language
-        translated_input_obj = translator.translate(user_input, lang_src='auto', lang_tgt='en')
-        detected_lang = translated_input_obj.src # Get the detected source language
+        # IMPORTANT: google_trans (like googletrans) often uses 'dest' instead of 'lang_tgt'
+        # and returns a simple string or a different object.
+        # Let's revert to the original googletrans method call for simplicity,
+        # assuming google_trans 2.4.0 behaves like googletrans.
+        translated_input_obj = translator.translate(user_input, dest='en') # <--- Changed param back to 'dest'
+        detected_lang = translated_input_obj.src # This should still work if it returns a Translation object
         user_input_for_groq = translated_input_obj.text if detected_lang == "ha" else user_input
     except Exception as e:
         # Fallback if translation fails
@@ -176,7 +181,8 @@ Always escalate to a human if:
         reply_english = result["choices"][0]["message"]["content"]
 
         if detected_lang == "ha":
-            final_reply = translator.translate(reply_english, lang_src='en', lang_tgt='ha').text
+            # Reverting parameters for translate method based on google_trans behavior
+            final_reply = translator.translate(reply_english, dest='ha').text # <--- Changed param back to 'dest'
         else:
             final_reply = reply_english
 
@@ -208,3 +214,4 @@ async def whatsapp_webhook(
     twilio_response.message(reply_text)
 
     return str(twilio_response)
+
